@@ -25,6 +25,7 @@ import (
 	"github.com/coredns/coredns/plugin/debug"
 	"github.com/coredns/coredns/plugin/dnstap"
 	"github.com/coredns/coredns/plugin/metadata"
+	"github.com/coredns/coredns/plugin/pkg/fall"
 	clog "github.com/coredns/coredns/plugin/pkg/log"
 	"github.com/coredns/coredns/request"
 	"github.com/miekg/dns"
@@ -46,6 +47,7 @@ type Fanout struct {
 	attempts       int
 	workerCount    int
 	tapPlugin      *dnstap.Dnstap
+	fall           fall.F
 	Next           plugin.Handler
 }
 
@@ -102,12 +104,21 @@ func (f *Fanout) ServeDNS(ctx context.Context, w dns.ResponseWriter, m *dns.Msg)
 	}
 	result := f.getFanoutResult(timeoutContext, responseCh)
 	if result == nil {
+		// fallthrough if no result
+		if f.fall.Through(req.Name()) {
+			return plugin.NextOrFailure(f.Name(), f.Next, ctx, w, m)
+		}
 		return dns.RcodeServerFailure, timeoutContext.Err()
 	}
 	metadata.SetValueFunc(ctx, "fanout/upstream", func() string {
 		return result.client.Endpoint()
 	})
+
 	if result.err != nil {
+		// fallthrough if error
+		if f.fall.Through(req.Name()) {
+			return plugin.NextOrFailure(f.Name(), f.Next, ctx, w, m)
+		}
 		return dns.RcodeServerFailure, result.err
 	}
 	if f.tapPlugin != nil {
@@ -120,6 +131,12 @@ func (f *Fanout) ServeDNS(ctx context.Context, w dns.ResponseWriter, m *dns.Msg)
 		logErrIfNotNil(w.WriteMsg(formerr))
 		return 0, nil
 	}
+
+	// fallthrough no good result
+	if result.response.Rcode != dns.RcodeSuccess && f.fall.Through(req.Name()) {
+		return plugin.NextOrFailure(f.Name(), f.Next, ctx, w, m)
+	}
+
 	logErrIfNotNil(w.WriteMsg(result.response))
 	return 0, nil
 }

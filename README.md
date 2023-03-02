@@ -30,6 +30,10 @@ Each incoming DNS query that hits the CoreDNS fanout plugin will be replicated i
 * `attempt-count` is the number of attempts to connect to upstream servers that are needed before considering an upstream to be down. If 0, the upstream will never be marked as down and request will be finished by `timeout`. Default is `3`.
 * `timeout` is the timeout of request. After this period, attempts to receive a response from the upstream servers will be stopped. Default is `30s`.
 * `race` gives priority to the first result, whether it is negative or not, as long as it is a standard DNS result.
+* `fallthrough` If a zone matches but no record can be generated, pass request
+to the next plugin. If **[ZONES…]** is omitted, then fallthrough happens for
+all zones for which the plugin is authoritative. If specific zones are listed
+then only queries for those zones will be subject to fallthrough.
 ## Metrics
 
 If monitoring is enabled (via the *prometheus* plugin) then the following metric are exported:

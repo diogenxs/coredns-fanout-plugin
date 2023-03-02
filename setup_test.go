@@ -29,15 +29,16 @@ import (
 
 func TestSetup(t *testing.T) {
 	tests := []struct {
-		input            string
-		expectedFrom     string
-		expectedTo       []string
-		expectedIgnored  []string
-		expectedWorkers  int
-		expectedAttempts int
-		expectedTimeout  time.Duration
-		expectedNetwork  string
-		expectedErr      string
+		input                    string
+		expectedFrom             string
+		expectedTo               []string
+		expectedIgnored          []string
+		expectedWorkers          int
+		expectedAttempts         int
+		expectedTimeout          time.Duration
+		expectedNetwork          string
+		expectedErr              string
+		expectedFallThroughZones []string
 	}{
 		// positive
 		{input: "fanout . 127.0.0.1", expectedFrom: ".", expectedAttempts: 3, expectedWorkers: 1, expectedTimeout: defaultTimeout, expectedNetwork: "udp"},
@@ -45,6 +46,7 @@ func TestSetup(t *testing.T) {
 		{input: "fanout . 127.0.0.1 127.0.0.2 {\nnetwork tcp\n}", expectedFrom: ".", expectedTimeout: defaultTimeout, expectedAttempts: 3, expectedWorkers: 2, expectedNetwork: "tcp", expectedTo: []string{"127.0.0.1:53", "127.0.0.2:53"}},
 		{input: "fanout . 127.0.0.1 127.0.0.2 127.0.0.3 127.0.0.4 {\nworker-count 3\ntimeout 1m\n}", expectedTimeout: time.Minute, expectedAttempts: 3, expectedFrom: ".", expectedWorkers: 3, expectedNetwork: "udp"},
 		{input: "fanout . 127.0.0.1 127.0.0.2 127.0.0.3 127.0.0.4 {\nattempt-count 2\n}", expectedTimeout: defaultTimeout, expectedFrom: ".", expectedAttempts: 2, expectedWorkers: 4, expectedNetwork: "udp"},
+		{input: "fanout . 127.0.0.1 {\nfallthrough .\n}", expectedFrom: ".", expectedAttempts: 3, expectedWorkers: 1, expectedTimeout: defaultTimeout, expectedNetwork: "udp", expectedFallThroughZones: []string{"."}},
 
 		// negative
 		{input: "fanout . aaa", expectedErr: "not an IP address or file"},
@@ -96,6 +98,12 @@ func TestSetup(t *testing.T) {
 		}
 		if f.net != test.expectedNetwork {
 			t.Fatalf("Test %d: expected: %v, got: %v", i, test.expectedNetwork, f.net)
+		}
+
+		if test.expectedFallThroughZones != nil {
+			if !reflect.DeepEqual(f.fall.Zones, test.expectedFallThroughZones) {
+				t.Fatalf("Test %d: expected: %q, actual: %q", i, test.expectedFallThroughZones, f.fall.Zones)
+			}
 		}
 	}
 }

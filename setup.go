@@ -171,6 +171,9 @@ func parseValue(v string, f *Fanout, c *caddyfile.Dispenser) error {
 		num, err := parsePositiveInt(c)
 		f.attempts = num
 		return err
+	case "fallthrough":
+		f.fall.SetZonesFromArgs(c.RemainingArgs())
+		return nil
 	default:
 		return errors.Errorf("unknown property %v", v)
 	}
